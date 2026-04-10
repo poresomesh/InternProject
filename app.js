@@ -92,7 +92,7 @@ app.get("/demouser", async (req, res) => {
 
 // index route
 
-app.get("/listings" , async (req , res ) =>{
+app.get("/" , async (req , res ) =>{
     const allListings = await Listing.find({});
     res.render("listings/index.ejs" , {allListings});
 
