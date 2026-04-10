@@ -79,11 +79,6 @@ app.listen(8080 , () =>{
     console.log("port is listing");
 });
 
-app.get("/" ,(req , res )=>{
-    res.send("Hii Im root");
-});
-
-
 
 app.get("/demouser", async (req, res) => {
   let fakeUser = {
@@ -94,20 +89,6 @@ app.get("/demouser", async (req, res) => {
   let registeredUser = await User.register(fakeUser, "helloworld");
   res.send(registeredUser);
 });
-
-
-// app.get("/testListing" , async (req , res ) => {
-//     let sampleListing = new Listing ({
-//         title : " My new Villa" ,
-//         description :  "near forest with full nature vibes..!!" ,
-//         price : 1500 ,
-//         location : "kerala" ,
-//         country : "India"
-//     });
-//     await sampleListing.save();
-//     console.log("data saved..");
-//     res.send("successfull testing...");
-// });
 
 // index route
 
