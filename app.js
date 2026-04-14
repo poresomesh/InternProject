@@ -119,7 +119,7 @@ app.get("/listings/:id" , async (req ,res ) => {
       }).populate("owner");
     if(!listing){
       req.flash("error" , "Listing you requested is not exist");
-      req.redirect("/listings");
+      req.redirect("/");
     }
     console.log(listing);
     res.render("listings/show.ejs" , {listing});
@@ -137,7 +137,7 @@ app.post("/listings", upload.single("listing[image]"), async (req, res, next) =>
          }
 
          await newListings.save();
-         res.redirect("/listings");
+         res.redirect("/");
     }catch(err){
         next(err);
     };
@@ -178,7 +178,7 @@ app.delete("/listings/:id", async (req, res) => {
   let { id } = req.params;
   let deletedListing = await Listing.findByIdAndDelete(id);
   console.log(deletedListing);
-  res.redirect("/listings");
+  res.redirect("/");
 });
 
 //Reviews 
@@ -225,7 +225,7 @@ app.post("/signup", async (req, res) => {
         return next(err);
       }
       req.flash("success", "Welcome to WanderLust!");
-      res.redirect("/listings");
+      res.redirect("/");
     });
   }catch (e) {
     req.flash("error", e.message);
@@ -243,7 +243,7 @@ app.post("/login" , passport.authenticate("local" ,
     {failureRedirect : `/login` , failureFlash: true}),
     async(req ,res)=>{
       req.flash("success","Welcome back to wanderlust...!");
-      res.redirect("/listings");
+      res.redirect("/");
 });
 
 //logout
@@ -255,6 +255,6 @@ app.get("/logout", (req, res) => {
       return next(err);
     }
     req.flash("success", "Logged out successfully!");
-    res.redirect("/listings");
+    res.redirect("/");
   });
 });
