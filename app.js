@@ -24,12 +24,18 @@ const {storage} =require("./cloudConfig.js");
 const { url } = require('inspector');
 const upload = multer({ storage });
 
+const Booking = require("./models/booking.js");
+
 
 const dburl = process.env.ATLASDB_URL;
 
 main()
     .then( ()=> {
         console.log("connection success");
+
+        app.listen(8080 , () =>{
+        console.log("port is listing");
+        });
     })
     .catch(err => console.log(err));
 
@@ -70,14 +76,15 @@ app.use((req, res, next) => {
   res.locals.success = req.flash("success");
   res.locals.error = req.flash("error");
   res.locals.currUser = req.user;
+
+  res.locals.currPath = req.path;
+  
   next();
 });
 
  
 
-app.listen(8080 , () =>{
-    console.log("port is listing");
-});
+
 
 
 app.get("/demouser", async (req, res) => {
@@ -92,39 +99,134 @@ app.get("/demouser", async (req, res) => {
 
 // index route
 
-app.get("/" , async (req , res ) =>{
-    const allListings = await Listing.find({});
-    res.render("listings/index.ejs" , {allListings});
-
+// INDEX ROUTE
+app.get("/", async (req, res) => {
+    let { category } = req.query;
+    let allListings;
+    if (category) {
+        allListings = await Listing.find({ category: category });
+    } else {
+        allListings = await Listing.find({});
+    }
+    // Use currPath here
+    res.render("listings/index.ejs", { allListings, currPath: "/" });
 });
-
 //new route 
 
 app.get("/listings/new" , (req , res )=>{
+    
   if(!req.isAuthenticated()){
     req.flash("error","you must be logged in to create listings...!");
     return res.redirect("/login");
   }
-    res.render("listings/new.ejs");
+  
+    res.render("listings/new.ejs" , { currPath: "new_listing" });
 });
 
 
 //show route
 
-app.get("/listings/:id" , async (req ,res ) => {
-    let {id} = req.params;
-    const listing = await Listing.findById(id).populate({ path : "reviews" ,
-       populate :{path : "author" ,
-        } ,
-      }).populate("owner");
-    if(!listing){
-      req.flash("error" , "Listing you requested is not exist");
-      req.redirect("/");
+
+//UPDATE your existing Show Route to include bookings
+app.get("/listings/:id", async (req, res, next) => {
+    let { id } = req.params;
+
+    // 1. Skip this route if the ID is just the word "search"
+    if (id === "search") {
+        return next(); 
     }
-    console.log(listing);
-    res.render("listings/show.ejs" , {listing});
+
+    // 2. Validate the ID format
+    const mongoose = require("mongoose");
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        req.flash("error", "Invalid Listing ID!");
+        return res.redirect("/");
+    }
+
+    try {
+        // 3. Populate listing, reviews, and authors
+        const listing = await Listing.findById(id)
+            .populate({
+                path: "reviews",
+                populate: { path: "author" },
+            })
+            .populate("owner");
+
+        if (!listing) {
+            req.flash("error", "Listing you requested for does not exist!");
+            return res.redirect("/");
+        }
+
+        // 4. Booking Dates logic (Crucial for your calendar)
+        const bookings = await Booking.find({ listing: id });
+        let bookedDates = [];
+        bookings.forEach(b => {
+            let current = new Date(b.checkIn);
+            while (current < b.checkOut) {
+                bookedDates.push(current.toISOString().split('T')[0]);
+                current.setDate(current.getDate() + 1);
+            }
+        });
+
+        // 5. Render with all data
+        res.render("listings/show.ejs", { 
+            listing, 
+            bookedDates: JSON.stringify(bookedDates),
+            currPath: req.path // Explicitly passing this ensures navbar works
+        });
+
+    } catch (err) {
+        console.error(err);
+        req.flash("error", "Something went wrong!");
+        res.redirect("/");
+    }
 });
 
+// 3. ADD this new POST route for handling the booking
+app.post("/listings/:id/book", async (req, res) => {
+    if (!req.isAuthenticated()) {
+        req.flash("error", "You must be logged in to book!");
+        return res.redirect("/login");
+    }
+
+    let { id } = req.params;
+    let { checkIn, checkOut } = req.body;
+    const requestedIn = new Date(checkIn);
+    const requestedOut = new Date(checkOut);
+
+    if (requestedIn >= requestedOut) {
+        req.flash("error", "Check-out must be after check-in!");
+        return res.redirect(`/listings/${id}`);
+    }
+
+    try {
+        // Check if any existing booking overlaps with these dates
+        const overlap = await Booking.findOne({
+            listing: id,
+            checkIn: { $lt: requestedOut }, 
+            checkOut: { $gt: requestedIn }
+        });
+
+        if (overlap) {
+            req.flash("error", "These dates are already taken. Please check the 'Already Booked' list below.");
+            return res.redirect(`/listings/${id}`);
+        }
+
+        const newBooking = new Booking({
+            listing: id,
+            user: req.user._id,
+            checkIn: requestedIn,
+            checkOut: requestedOut
+        });
+
+        await newBooking.save();
+        req.flash("success", "Hotel booked successfully!");
+        res.redirect(`/listings/${id}`);
+    } catch (err) {
+        req.flash("error", "Server error. Please try again.");
+        res.redirect(`/listings/${id}`);
+    }
+});
 //create route 
 
 app.post("/listings", upload.single("listing[image]"), async (req, res, next) => {
@@ -257,4 +359,145 @@ app.get("/logout", (req, res) => {
     req.flash("success", "Logged out successfully!");
     res.redirect("/");
   });
+});
+
+
+
+//BOOKING Route
+app.post("/listings/:id/book", async (req, res) => {
+    if (!req.isAuthenticated()) {
+        req.flash("error", "Please login to book!");
+        return res.redirect("/login");
+    }
+
+    const { id } = req.params;
+    const { checkIn, checkOut } = req.body;
+
+    // Convert strings from form into actual JS Date Objects
+    const requestedCheckIn = new Date(checkIn);
+    const requestedCheckOut = new Date(checkOut);
+
+    try {
+        // 1. Find ANY booking for THIS hotel where dates overlap
+        // Logic: A booking overlaps if (NewIn < ExistingOut) AND (NewOut > ExistingIn)
+        const overlap = await Booking.findOne({
+            listing: id,
+            checkIn: { $lt: requestedCheckOut }, 
+            checkOut: { $gt: requestedCheckIn }
+        });
+
+        if (overlap) {
+            req.flash("error", "These dates are already booked! Try different dates.");
+            return res.redirect(`/listings/${id}`);
+        }
+
+        // 2. If no overlap, create the booking
+        const newBooking = new Booking({
+            listing: id,
+            user: req.user._id,
+            checkIn: requestedCheckIn,
+            checkOut: requestedCheckOut
+        });
+
+        await newBooking.save();
+        req.flash("success", "Booking confirmed!");
+        res.redirect(`/listings/${id}`);
+
+    } catch (err) {
+        console.error(err);
+        req.flash("error", "Booking failed due to a server error.");
+        res.redirect(`/listings/${id}`);
+    }
+});
+
+// --- UPDATED BOOKING ROUTE WITH AVAILABILITY CHECK ---
+app.post("/listings/:id/book", async (req, res) => {
+    if (!req.isAuthenticated()) {
+        req.flash("error", "You must be logged in to book!");
+        return res.redirect("/login");
+    }
+
+    let { id } = req.params;
+    let { checkIn, checkOut } = req.body;
+
+    const newIn = new Date(checkIn);
+    const newOut = new Date(checkOut);
+
+    // 1. Basic Date Validation
+    if (!checkIn || !checkOut || newIn >= newOut) {
+        req.flash("error", "Invalid dates! Check-out must be after check-in.");
+        return res.redirect(`/listings/${id}`);
+    }
+
+    try {
+        // 2. AVAILABILITY LOGIC: Find overlapping bookings for THIS listing
+        const existingBookings = await Booking.find({
+            listing: id,
+            $or: [
+                {
+                    checkIn: { $lt: newOut },
+                    checkOut: { $gt: newIn }
+                }
+            ]
+        });
+
+        // 3. If any booking exists in that range, block the request
+        if (existingBookings.length > 0) {
+            req.flash("error", "Sorry, this hotel is already booked for the selected dates!");
+            return res.redirect(`/listings/${id}`);
+        }
+
+        // 4. If free, save the booking
+        const newBooking = new Booking({
+            listing: id,
+            user: req.user._id,
+            checkIn: newIn,
+            checkOut: newOut
+        });
+
+        await newBooking.save();
+        req.flash("success", "Booking confirmed! Your dates are locked in.");
+        res.redirect(`/listings/${id}`);
+
+    } catch (err) {
+        console.error("Booking Error:", err);
+        req.flash("error", "Internal Server Error.");
+        res.redirect(`/listings/${id}`);
+    }
+});
+
+
+
+// 1. SEARCH (MUST be above :id)
+app.get("/listings/search", async (req, res) => {
+    let { title } = req.query;
+    const allListings = await Listing.find({ title: { $regex: title, $options: "i" } });
+    res.render("listings/index.ejs", { allListings });
+});
+
+// 2. NEW (To create a new listing)
+app.get("/listings/new", (req, res) => {
+    res.render("listings/new.ejs");
+});
+
+// 3. SHOW (The :id route is a "catch-all", it must stay below specific words)
+app.get("/listings/:id", async (req, res) => {
+    let { id } = req.params;
+    try {
+        const listing = await Listing.findById(id).populate("reviews").populate("owner");
+        const bookings = await Booking.find({ listing: id });
+        
+        // ... (your existing bookedDates logic) ...
+
+        res.render("listings/show.ejs", { listing, bookedDates: JSON.stringify(bookedDates) });
+    } catch (err) {
+        // If someone types a wrong ID manually, this prevents the crash
+        req.flash("error", "Invalid ID format!");
+        res.redirect("/listings");
+    }
+});
+
+// 4. BOOKING POST (Make sure this matches your form action)
+app.post("/listings/:id/book", async (req, res) => {
+    // ... your booking logic ...
 });

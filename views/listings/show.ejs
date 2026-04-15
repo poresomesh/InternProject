@@ -24,13 +24,76 @@
     <br>
     <br>
     <% if (currUser && currUser._id.equals(listing.owner._id)) { %>
-    <div class="btns mt-3">
-    <a href="/listings/<%= listing._id %>/edit"  class="btn add-btn btn-dark col-1 offset-3">Edit</a>
-    <form method="POST" action="/listings/<%=listing._id%>?_method=DELETE">
-      <button class="btn add-btn btn-dark offset-5">Delete</button>
-    </form>
+    <div class="btns mt-3 d-flex align-items-center" >
+        <a href="/listings/<%= listing._id %>/edit"  class="btn add-btn btn-dark col-1 offset-3">Edit</a>
+        <form method="POST" action="/listings/<%=listing._id%>?_method=DELETE">
+        <button class="btn add-btn btn-dark offset-5">Delete</button>
+        </form>
     </div>
     <% } %>
+
+
+    <div class="col-8 offset-3 mb-3">
+    <hr />
+    <h4>Book Your Stay</h4>
+    
+    <form action="/listings/<%= listing._id %>/book" method="POST" novalidate class="needs-validation">
+        <div class="row">
+            <div class="mb-3 col-md-6">
+                <label for="checkIn" class="form-label">Check-in</label>
+                <input type="date" name="checkIn" id="checkIn" class="form-control" required>
+                <div id="checkInError" class="text-danger small mt-1"></div>
+            </div>
+            <div class="mb-3 col-md-6">
+                <label for="checkOut" class="form-label">Check-out</label>
+                <input type="date" name="checkOut" id="checkOut" class="form-control" required>
+            </div>
+        </div>
+        <button class="btn btn-primary w-100" id="bookBtn">Confirm Booking</button>
+    </form>
+</div>
+
+<script>
+    // Wrapping in quotes fixes the VS Code "Expression expected" error
+    const data = '<%- bookedDates %>'; 
+    const bookedDates = JSON.parse(data); // Turn the string back into a JS array
+    
+    const checkInInput = document.getElementById('checkIn');
+    const checkOutInput = document.getElementById('checkOut');
+    const errorDiv = document.getElementById('checkInError');
+    const bookBtn = document.getElementById('bookBtn');
+
+    // 1. Prevent selecting past dates
+    const today = new Date().toISOString().split('T')[0];
+    checkInInput.setAttribute('min', today);
+    checkOutInput.setAttribute('min', today);
+
+    // 2. Logic to check if date is already booked
+    function isDateBooked(dateStr) {
+        return bookedDates.includes(dateStr);
+    }
+
+    checkInInput.addEventListener('change', function() {
+        if (isDateBooked(this.value)) {
+            errorDiv.innerText = "This date is already booked!";
+            this.value = ""; 
+            bookBtn.disabled = true;
+        } else {
+            errorDiv.innerText = "";
+            bookBtn.disabled = false;
+            checkOutInput.setAttribute('min', this.value);
+        }
+    });
+
+    checkOutInput.addEventListener('change', function() {
+        if (isDateBooked(this.value)) {
+            alert("This range overlaps with an existing booking.");
+            this.value = "";
+        }
+    });
+</script>
+
+
 
     <div class="col-8 offset-3 mb-3 mt-3">
         <hr>
@@ -43,7 +106,7 @@
             <label for="rating" class="form-label">Rating</label>
             <fieldset class="starability-basic">        
                 <!-- <input type="range" min="1" max="5" id="rating" name="review[rating]"> -->
-                <input type="radio" id="no-rate" class="input-no-rate" name="review[rating]" value="0" />
+                <input type="radio" id="no-rate" class="input-no-rate" name="review[rating]" value="0" checked aria-label="No rating." />
                 <input type="radio" id="first-rate1" name="review[rating]" value="1" />
                 <label for="first-rate1" title="Terrible">1 star</label>
                 <input type="radio" id="first-rate2" name="review[rating]" value="2" />

@@ -76,10 +76,109 @@ body {
     border: none !important;
 }
 
-/* Show img */
-.show-img{
-    height: 30vh;
-}
-.btns{
+/* Center and Width of the Search Form */
+.search-form {
     display: flex;
+    align-items: center;
+    border: 1px solid #ccc;
+    border-radius: 50px; /* Makes it a pill shape */
+    padding: 0 5px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    background-color: white;
 }
+
+.search-input {
+    border: none !important;
+    border-radius: 50px !important;
+    width: 500px !important; /* Increase this number to make it wider */
+    padding: 0.6rem 1.5rem !important;
+    font-size: 0.95rem;
+}
+
+/* Remove the blue highlight when clicking the input */
+.search-input:focus {
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.search-btn {
+    background-color: #fe424d !important;
+    color: white !important;
+    border-radius: 50% !important; /* Circular button */
+    height: 35px;
+    width: 35px;
+    padding: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 5px;
+    transition: 0.3s;
+}
+
+.search-btn:hover {
+    background-color: #d8353f !important;
+}
+
+/* Responsive: Make it smaller on mobile screens */
+@media (max-width: 768px) {
+    .search-input {
+        width: 100% !important;
+    }
+}
+
+
+
+/* The active state for the navbar link */
+.nav-active-link {
+    font-size: 1.2rem !important; /* Makes it bigger */
+    font-weight: 700 !important;   /* Makes it bold */
+    color: #fe424d !important;    /* Changes color to your brand red */
+    border-bottom: 3px solid #fe424d; /* Adds a nice underline */
+    padding-bottom: 2px;
+}
+
+/* Optional: Smooth transition when it changes */
+.nav-link {
+    transition: all 0.2s ease-in-out;
+}
+
+
+/* filter icons */
+
+#filters {
+    display: flex;
+    flex-wrap: nowrap; /* Keeps icons in one line */
+    align-items: center;
+    overflow-x: auto; /* Allows scrolling on small screens */
+    margin-top: 1rem;
+}
+
+.filter {
+    text-align: center;
+    margin-right: 2rem;
+    margin-top: 1.5rem;
+    opacity: 0.7;
+    transition: 0.2s;
+}
+
+.filter:hover {
+    opacity: 1;
+    cursor: pointer;
+    border-bottom: 2px solid #fe424d; /* Red line under active icon */
+}
+
+.filter i {
+    font-size: 1.2rem;
+}
+
+.filter p {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+/* Hide scrollbar but keep functionality */
+#filters::-webkit-scrollbar {
+    display: none;
+}
+
+
