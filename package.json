@@ -1,6 +1,6 @@
 {
   "engines": {
-    "node" : "24.13.1"
+    "node": "24.13.1"
   },
   "name": "internproject",
   "version": "1.0.0",

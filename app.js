@@ -1,4 +1,3 @@
-
 if(process.env.NODE_ENV !=="production"){
   require('dotenv').config();
 }
@@ -12,38 +11,43 @@ const methodOverride = require("method-override");
 const ejsMate = require("ejs-mate");
 const Review = require("./models/review.js");
 const session = require("express-session");
-const MongoStore = require('connect-mongo');
-const flash = require("connect-flash");
 
+// MODIFIED IMPORT FOR VERSION 6
+const MongoStore = require('connect-mongo').default; 
+
+const flash = require("connect-flash");
 const passport = require("passport");
 const LocalStrategy = require("passport-local");
- 
 const User = require("./models/user.js");
 const multer  = require('multer');
 const {storage} =require("./cloudConfig.js");
-const { url } = require('inspector');
 const upload = multer({ storage });
-
 const Booking = require("./models/booking.js");
 
+const dbUrl = process.env.ATLASDB_URL;
 
-const dburl = process.env.ATLASDB_URL;
-
+// --- DATABASE CONNECTION ---
+// Ensure this is called at the end of your middleware/setup
+console.log("Attempting to connect with URL:", dbUrl);
 main()
-    .then( ()=> {
+    .then(() => {
         console.log("connection success");
-
-        app.listen(8080 , () =>{
-        console.log("port is listing");
+        app.listen(8080, () => {
+            console.log("port is listening");
         });
     })
-    .catch(err => console.log(err));
+    .catch((err) => {
+        console.log("DATABASE CONNECTION ERROR:", err);
+    });
 
 async function main() {
-  await mongoose.connect(dburl);
-
+    // Ensure dbUrl is actually defined!
+    await mongoose.connect(dbUrl , {
+        serverSelectionTimeoutMS: 5000, // Wait only 5 seconds
+    });
 }
 
+// --- APP SETTINGS ---
 app.set("view engine" , "ejs");
 app.set("views" , path.join(__dirname , "views"));
 app.use(express.urlencoded({extended : true }));
@@ -52,12 +56,34 @@ app.use(methodOverride("_method"));
 app.engine("ejs" , ejsMate);
 app.use(express.static(path.join(__dirname , "/public")));
 
+// --- SESSION & MONGO STORE (VERSION 6 COMPATIBLE) ---
+const store = MongoStore.create({
+    mongoUrl: dbUrl, 
+    crypto: {
+        secret: process.env.SECRET || "mysupersecretcode",
+    },
+    touchAfter: 24 * 3600,
+});
 
-app.use(session({
-  secret: process.env.SECRET,
-  resave: false,
-  saveUninitialized: true
-}));
+store.on("error", (err) => {
+    console.log("ERROR IN MONGO SESSION STORE", err);
+});
+
+const sessionOptions = {
+    store: store, 
+    secret: process.env.SECRET || "mysupersecretcode",
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+    },
+};
+
+// --- MIDDLEWARE ORDER ---
+app.use(session(sessionOptions));
+app.use(flash());
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -66,21 +92,17 @@ passport.use(new LocalStrategy(User.authenticate()));
 passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
 
-
-
-
-app.use(flash());
-
-// Make flash messages available in all templates
 app.use((req, res, next) => {
   res.locals.success = req.flash("success");
   res.locals.error = req.flash("error");
   res.locals.currUser = req.user;
-
   res.locals.currPath = req.path;
-  
   next();
 });
+
+// ... Your routes follow here ...
+
+// ... Your Routes Go Here ...
 
  
 
